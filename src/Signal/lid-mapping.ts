@@ -1,6 +1,6 @@
 import type { LIDMapping, SignalKeyStoreWithTransaction } from '../Types'
 import type { ILogger } from '../Utils/logger'
-import { isJidHostedLidUser, isJidHostedPnUser, isLidUser, isPnUser, jidDecode, jidNormalizedUser } from '../WABinary'
+import { isHostedLidUser, isHostedPnUser, isLidUser, isPnUser, jidDecode, jidNormalizedUser, WAJIDDomains } from '../WABinary'
 import NodeCache from '@cacheable/node-cache'
 
 export class LIDMappingStore {
