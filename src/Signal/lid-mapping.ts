@@ -1,12 +1,13 @@
+import { LRUCache } from 'lru-cache'
 import type { LIDMapping, SignalKeyStoreWithTransaction } from '../Types'
 import type { ILogger } from '../Utils/logger'
-import { isHostedLidUser, isHostedPnUser, isLidUser, isPnUser, jidDecode, jidNormalizedUser, WAJIDDomains } from '../WABinary'
-import NodeCache from '@cacheable/node-cache'
+import { isHostedPnUser, isLidUser, isPnUser, jidDecode, jidNormalizedUser, WAJIDDomains } from '../WABinary'
 
 export class LIDMappingStore {
-	private readonly mappingCache = new NodeCache<string>({
-		stdTTL: 60 * 60, //1h
-        useClones: false
+	private readonly mappingCache = new LRUCache<string, string>({
+		ttl: 3 * 24 * 60 * 60 * 1000, // 7 days
+		ttlAutopurge: true,
+		updateAgeOnGet: true
 	})
 	private readonly keys: SignalKeyStoreWithTransaction
 	private readonly logger: ILogger
