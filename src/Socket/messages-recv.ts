@@ -891,30 +891,47 @@ export const makeMessagesRecvSocket = (config: SocketConfig) => {
 
 	const handlePrivacyTokenNotification = async (node: BinaryNode) => {
 		const tokensNode = getBinaryNodeChild(node, 'tokens')
-		const from = jidNormalizedUser(node.attrs.from)
+		const fromJid = jidNormalizedUser(node.attrs.from)
+		const senderLid = node.attrs.sender_lid ? jidNormalizedUser(node.attrs.sender_lid) : undefined
 
 		if (!tokensNode) return
 
 		const tokenNodes = getBinaryNodeChildren(tokensNode, 'token')
+		const updates: { jid: string; token: Uint8Array }[] = []
 
 		for (const tokenNode of tokenNodes) {
-			const { attrs, content } = tokenNode
-			const type = attrs.type
-			const timestamp = attrs.t
+			const { content } = tokenNode
+			const token = content as Uint8Array
 
-			if (type === 'trusted_contact' && content instanceof Buffer) {
-				logger.debug(
-					{
-						from,
-						timestamp,
-						tcToken: content
-					},
-					'received trusted contact token'
-				)
+			updates.push({ jid: fromJid, token })
+			logger.debug({ jid: fromJid }, 'got privacy token update, storing against sender PN')
 
-				await authState.keys.set({
-					tctoken: { [from]: { token: content, timestamp } }
-				})
+			if (senderLid) {
+				updates.push({ jid: senderLid, token })
+				logger.debug({ jid: senderLid }, 'also storing privacy token against sender LID')
+
+				try {
+					await signalRepository.lidMapping.storeLIDPNMappings([{ lid: senderLid, pn: fromJid }])
+				} catch (error) {
+					logger.warn({ err: error, fromJid, senderLid }, 'failed to store LID mapping from privacy token')
+				}
+			}
+		}
+
+		if (updates.length > 0) {
+			const chatUpdates: { id: string; tcToken: Uint8Array }[] = []
+			const uniqueJids = new Set(updates.map(u => u.jid))
+			for (const jid of uniqueJids) {
+				const update = updates.find(u => u.jid === jid)
+				if (update) {
+					chatUpdates.push({ id: jid, tcToken: update.token })
+				}
+			}
+
+			ev.emit('chats.update', chatUpdates)
+
+			if (config.storePrivacyTokens) {
+				await config.storePrivacyTokens(updates)
 			}
 		}
 	}
